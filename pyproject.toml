@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netbox-model-map"
+version = "0.1.0"
+description = "NetBox plugin: an interactive map of the data model, custom object types included"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "netbox_model_map/static/netbox_model_map/elk-LICENSE.md"]
+authors = [{ name = "Siem Hermans" }]
+requires-python = ">=3.12"
+keywords = ["netbox", "netbox-plugin", "data-model", "custom-objects"]
+classifiers = [
+    "Framework :: Django",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking",
+]
+
+[project.urls]
+Homepage = "https://github.com/siemhermans/netbox-model-map"
+Issues = "https://github.com/siemhermans/netbox-model-map/issues"
+
+[tool.setuptools.packages.find]
+include = ["netbox_model_map*"]
+
+[tool.setuptools.package-data]
+netbox_model_map = ["templates/netbox_model_map/*.html", "static/netbox_model_map/*"]

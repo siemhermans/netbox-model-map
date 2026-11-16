@@ -1,0 +1,21 @@
+{% extends 'generic/_base.html' %}
+{% load static %}
+
+{% block title %}Model map{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'netbox_model_map/map.css' %}?v={{ version }}">
+{% endblock %}
+
+{% block control-buttons %}
+  <a href="?download" class="btn btn-outline-secondary"><i class="mdi mdi-download"></i> Download as HTML</a>
+{% endblock %}
+
+{% block content %}
+  {% include 'netbox_model_map/_body.html' %}
+{% endblock %}
+
+{% block javascript %}
+  <script src="{% static 'netbox_model_map/elk.bundled.js' %}?v=0.9.3"></script>
+  <script src="{% static 'netbox_model_map/map.js' %}?v={{ version }}"></script>
+{% endblock %}
