@@ -33,8 +33,9 @@ instance, so it always shows *your* custom object types and fields.
 - **Compare views:** two views side by side, each with its own view picker, details
   panel and zoom (`/plugins/model-map/?compare`, or `?compare&left=<view>&right=<view>`).
 - **Download SVG or PNG:** the view on screen as an image, for documents and
-  slides, with the switches as they are set. The PNG has twice the screen
-  resolution and the map's fonts built in.
+  slides, with the switches as they are set and a transparent background. The
+  PNG has twice the screen resolution and the map's fonts built in. Export in
+  light mode for a light page: in dark mode the text is light.
 - **Download as HTML:** a single file with the whole map that works without
   NetBox, for sharing. It loads the layout library and fonts from the internet
   when opened.
@@ -55,12 +56,12 @@ itself works offline; only the downloaded HTML file needs internet.
 
 ```bash
 source /opt/netbox/venv/bin/activate
-pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.3.0.tar.gz
+pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.3.1.tar.gz
 ```
 
 Without internet on the NetBox host, download the wheel from the
 [Releases](https://github.com/siemhermans/netbox-model-map/releases) page and run
-`pip install --no-deps netbox_model_map-0.3.0-py3-none-any.whl`.
+`pip install --no-deps netbox_model_map-0.3.1-py3-none-any.whl`.
 
 To keep the plugin across NetBox upgrades, add the same URL (or the path to the
 wheel) to `/opt/netbox/local_requirements.txt`.
@@ -87,7 +88,7 @@ sudo systemctl restart netbox netbox-rq
 Add to the Dockerfile that installs your plugins:
 
 ```dockerfile
-RUN /usr/local/bin/uv pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.3.0.tar.gz \
+RUN /usr/local/bin/uv pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.3.1.tar.gz \
  && cp -r "$(/opt/netbox/venv/bin/python -c 'import netbox_model_map, os; print(os.path.dirname(netbox_model_map.__file__))')/static/netbox_model_map" \
           /opt/netbox/netbox/static/
 ```
@@ -209,6 +210,11 @@ Both land in `dist/`. Bump `version` in `pyproject.toml` and in
 `netbox_model_map/__init__.py` together.
 
 ## Changelog
+
+**0.3.1**
+
+- SVG and PNG downloads have a transparent background.
+- The line with NetBox and plugin versions above the map is gone.
 
 **0.3.0**
 

@@ -3,7 +3,6 @@ metadata, custom object types from the Custom Objects plugin (when installed).
 Runs on every page view; it takes a few dozen queries and no writes."""
 import inspect
 import re
-from datetime import date
 
 from django.apps import apps
 from django.conf import settings
@@ -15,7 +14,6 @@ from django.utils.text import slugify
 from circuits.constants import CIRCUIT_TERMINATION_TERMINATION_TYPES
 from dcim.constants import LOCATION_SCOPE_TYPES
 from ipam.constants import VLANGROUP_SCOPE_TYPES
-from netbox.plugins import PluginConfig
 
 try:
     from netbox_custom_objects.models import CustomObjectType
@@ -235,9 +233,5 @@ def build():
 
     overview = cfg.get("overview") or OVERVIEW + [mid for mid, m in models.items() if m["app"] == "custom"]
     return {
-        "netbox": settings.RELEASE.version,
-        "plugins": {c.verbose_name: c.version for c in apps.get_app_configs()
-                    if isinstance(c, PluginConfig) and c.name != "netbox_model_map"},
-        "generated": date.today().isoformat(), "netbox_url": "",
-        "views": views, "overview": [mid for mid in overview if mid in models], "models": models,
+        "netbox_url": "", "views": views, "overview": [mid for mid in overview if mid in models], "models": models,
     }

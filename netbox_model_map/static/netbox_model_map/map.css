@@ -41,7 +41,6 @@
 .mm-toggle input { accent-color: var(--mm-accent); margin: 0; }
 .mm-btn { height: 32px; padding: 0 10px; border: 1px solid var(--mm-line); border-radius: 6px; background: var(--mm-bg); color: inherit; font: inherit; cursor: pointer; }
 .mm-btn:hover { border-color: var(--mm-accent); }
-.mm-badge { margin-left: auto; font: 500 11.5px var(--mm-mono); color: var(--mm-ink-3); }
 .mm-blurb { margin: 0; color: var(--mm-ink-2); max-width: 75ch; }
 
 .mm-stage { position: relative; min-height: 0; overflow: hidden; background-color: var(--mm-bg);
@@ -134,7 +133,6 @@
 @media (max-width: 760px) {
   .mm-head { gap: 6px; padding-block: 10px; }
   .mm-blurb { font-size: 13px; }
-  .mm-badge { margin-left: 0; }
   .mm-panel { top: auto; left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px));
     bottom: max(8px, env(safe-area-inset-bottom, 0px)); width: auto; max-height: 52%; }
   .with-panel .mm-zoom, .with-panel .mm-legend { display: none; }

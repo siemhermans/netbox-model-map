@@ -37,7 +37,6 @@ function keysIn(id, v, st) {
 }
 
 /* ---------- controls ---------- */
-$("badge").textContent = `NetBox ${D.netbox} · ` + Object.entries(D.plugins).map(([k, v]) => `${k} ${v}`).join(" · ") + ` · read ${D.generated}`;
 const viewSelect = $("view");
 const listed = D.views.filter(v => !v.hidden), plain = listed.filter(v => !v.heading);
 const headed = [...new Set(listed.map(v => v.heading).filter(Boolean))].map(h => [h, listed.filter(v => v.heading === h)]);
@@ -343,8 +342,7 @@ function exportSvg() {
   for (const a of ["id", "class", "aria-label", "style"]) out.removeAttribute(a);
   Object.entries({ xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` }).forEach(([k, v]) => out.setAttribute(k, v));
   out.querySelector("#mm-viewport").removeAttribute("transform");
-  out.insertBefore(el("rect", { width: W, height: H, fill: css.getPropertyValue("--mm-bg").trim() || "#fff" }), out.querySelector("#mm-viewport"));
-  return { out, W, H };
+  return { out, W, H };   // no background: the image is transparent
 }
 const svgBlob = out => new Blob([new XMLSerializer().serializeToString(out)], { type: "image/svg+xml" });
 function save(blob, ext) {
