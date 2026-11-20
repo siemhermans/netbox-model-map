@@ -328,13 +328,12 @@ root.addEventListener("keydown", e => {
   else if (e.key === "0") fit();
 });
 viewSelect.addEventListener("change", () => show(viewSelect.value));
-/* ---------- SVG download ---------- */
+/* ---------- SVG and PNG download ---------- */
 // The diagram's look comes from CSS classes and variables, so copy each element's computed style
 // onto the copy: the file then looks the same in any viewer (Inkscape, Visio, a browser).
 const SVG_PROPS = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-opacity", "opacity",
   "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "text-anchor", "display"];
-function downloadSvg() {
-  if (!current) return;
+function exportSvg() {
   const nid = state.sel ? nodeIdFor(state.sel) : null;
   highlight(null);   // export the plain diagram, not the selection dimming
   const W = Math.ceil(current.out.width), H = Math.ceil(current.out.height), out = svg.cloneNode(true);
@@ -345,12 +344,69 @@ function downloadSvg() {
   Object.entries({ xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` }).forEach(([k, v]) => out.setAttribute(k, v));
   out.querySelector("#mm-viewport").removeAttribute("transform");
   out.insertBefore(el("rect", { width: W, height: H, fill: css.getPropertyValue("--mm-bg").trim() || "#fff" }), out.querySelector("#mm-viewport"));
-  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(out)], { type: "image/svg+xml" }));
+  return { out, W, H };
+}
+const svgBlob = out => new Blob([new XMLSerializer().serializeToString(out)], { type: "image/svg+xml" });
+function save(blob, ext) {
+  const url = URL.createObjectURL(blob);
   const name = VIEWS[state.view].name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  Object.assign(document.createElement("a"), { href: url, download: `model-map-${name}.svg` }).click();
+  Object.assign(document.createElement("a"), { href: url, download: `model-map-${name}.${ext}` }).click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function downloadSvg() { if (current) save(svgBlob(exportSvg().out), "svg"); }
+
+// An SVG drawn as an image cannot load web fonts, so the PNG gets the fonts its text uses inlined as
+// data URLs. Without them the text falls back to another font and no longer fits its box.
+const unquote = s => s.trim().replace(/^["']|["']$/g, "");
+const covers = (range, cp) => !range || range.split(",").some(r => {   // unicode-range, e.g. "U+0000-00FF, U+4??"
+  const [lo, hi = lo] = r.trim().replace(/^U\+/i, "").split("-");
+  return parseInt(lo.replace(/\?/g, "0"), 16) <= cp && cp <= parseInt(hi.replace(/\?/g, "f"), 16);
+});
+const dataUrl = blob => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(blob); });
+async function fontFaces(out) {
+  const faces = [];
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try { rules = sheet.cssRules; } catch {   // a cross-origin sheet (Google Fonts in the downloaded file): read it ourselves
+      try { const s = new CSSStyleSheet(); s.replaceSync(await (await fetch(sheet.href)).text()); rules = s.cssRules; } catch { continue; }
+    }
+    for (const r of rules) {
+      if (r instanceof CSSFontFaceRule && covers(r.style.getPropertyValue("unicode-range"), 0x41)) faces.push({ s: r.style, base: sheet.href || location.href });
+    }
+  }
+  const css = new Map();
+  for (const key of new Set([...out.querySelectorAll("text")].map(t => [t.style.fontFamily, t.style.fontWeight, t.style.fontStyle].join("|")))) {
+    const [stack, weight, style] = key.split("|"), w = +weight || 400;
+    const family = stack.split(",").map(unquote).map(f => faces.filter(x => unquote(x.s.getPropertyValue("font-family")) === f)).find(l => l.length);
+    if (!family) continue;   // a system font: the image finds it itself
+    const fits = x => { const [lo, hi = lo] = (x.s.getPropertyValue("font-weight") || "400").split(/\s+/).map(v => ({ normal: 400, bold: 700 })[v] || +v); return lo <= w && w <= hi; };
+    const face = family.find(x => fits(x) && (x.s.getPropertyValue("font-style") || "normal") === style) || family.find(fits);
+    const src = face && /url\(["']?([^"')]+)/.exec(face.s.getPropertyValue("src"))?.[1];
+    if (!src || css.has(face)) continue;
+    try {
+      const url = await dataUrl(await (await fetch(new URL(src, face.base))).blob());
+      css.set(face, `@font-face{font-family:"${unquote(face.s.getPropertyValue("font-family"))}";font-weight:${face.s.getPropertyValue("font-weight") || 400};`
+        + `font-style:${face.s.getPropertyValue("font-style") || "normal"};src:url(${url})}`);
+    } catch {}   // offline: this font falls back to a system font in the PNG
+  }
+  return [...css.values()].join("");
+}
+async function downloadPng() {
+  if (!current) return;
+  const { out, W, H } = exportSvg();
+  out.prepend(Object.assign(document.createElementNS(NS, "style"), { textContent: await fontFaces(out) }));
+  const img = new Image(), src = URL.createObjectURL(svgBlob(out));
+  img.src = src;
+  try { await img.decode(); } finally { setTimeout(() => URL.revokeObjectURL(src), 1000); }
+  const scale = Math.min(2, 16000 / Math.max(W, H));   // sharp on HiDPI screens, within the browsers' canvas limits
+  const c = Object.assign(document.createElement("canvas"), { width: Math.round(W * scale), height: Math.round(H * scale) });
+  const g = c.getContext("2d");
+  g.scale(scale, scale);
+  g.drawImage(img, 0, 0, W, H);
+  c.toBlob(b => save(b, "png"), "image/png");
+}
 $("svgdl").addEventListener("click", downloadSvg);
+$("pngdl").addEventListener("click", downloadPng);
 $("optional").addEventListener("change", e => { state.optional = e.target.checked; show(state.view, state.sel); });
 $("fields").addEventListener("change", e => { state.fields = e.target.checked; show(state.view, state.sel); });
 $("tenant").addEventListener("change", e => { state.tenant = e.target.checked; show(state.view, state.sel); });
