@@ -133,14 +133,14 @@ def build():
                     rels.append({"field": f.name, "kind": kind, "req": kind != "m2m" and not (f.null or f.blank),
                                  "targets": [t]})
         doc = inspect.cleandoc(model.__doc__ or "")
-        keys = [f.name for f in model._meta.concrete_fields if not f.is_relation and f.editable
-                and f.name not in SKIP and not f.name.startswith("_") and f.get_internal_type() != "BooleanField"
-                and (f.name == "name" or not f.blank)]
+        fields = [f for f in model._meta.concrete_fields if not f.is_relation and f.editable
+                  and f.name not in SKIP and not f.name.startswith("_")]
+        keys = [f.name for f in fields if f.get_internal_type() != "BooleanField" and (f.name == "name" or not f.blank)]
         models[model.__name__] = {
             "label": _label(model._meta.verbose_name), "app": model._meta.app_label,
             "domain": DOMAINS[model._meta.app_label],
             "desc": "" if doc.startswith(model.__name__ + "(") else doc.split("\n\n")[0].replace("\n", " "),
-            "keys": keys[:6], "rules": _rules(model), "rels": rels,
+            "keys": keys[:6], "all": [f.name for f in fields], "req": keys, "rules": _rules(model), "rels": rels,
             "url": _url(f"{model._meta.app_label}:{model._meta.model_name}_list"),
         }
 
@@ -158,15 +158,16 @@ def build():
         return xid
 
     for c in cots:
-        rels, keys, scalars, rules = [], [], [], []
+        rels, keys, scalars, rules, fgroups = [], [], [], [], {}
         for f in c.fields.order_by("weight", "id"):
             if f.type in ("object", "multiobject"):
                 ots = list(f.related_object_types.all()) if f.is_polymorphic else [f.related_object_type]
                 kind = "m2m" if f.type == "multiobject" else "gfk" if f.is_polymorphic else "fk"
-                rels.append({"field": f.name, "kind": kind, "req": f.required and kind != "m2m",
+                rels.append({"field": f.name, "kind": kind, "req": f.required and kind != "m2m", "group": f.group_name or "",
                              "targets": [t for t in (ref_object_type(o) for o in ots if o) if t]})
             else:
                 scalars.append(f.name)
+                fgroups.setdefault(f.group_name or "", []).append(f.name)
                 if f.required or f.primary:
                     keys.append(f.name)
             lo, hi = f.validation_minimum, f.validation_maximum
@@ -182,7 +183,8 @@ def build():
         models[c.slug] = {
             "label": c.verbose_name or _label(c.name), "app": "custom", "domain": c.group_name or "Custom object",
             "group": c.group_name or "", "desc": c.description or "", "keys": (keys or scalars)[:6],
-            "rules": rules, "rels": rels, "url": f"/plugins/custom-objects/{c.slug}/",
+            "all": scalars, "req": keys,   # every field, and which are required: for "Optional fields"
+            "rules": rules, "rels": rels, "fields": fgroups, "url": f"/plugins/custom-objects/{c.slug}/",
         }
 
     # Two models can share a verbose name (Interface / VM interface is "interface" twice):
@@ -200,6 +202,13 @@ def build():
     views = [{"id": "overview", "name": "Overview",
               "blurb": "The main core models and every custom object type. Select a model for its "
                        "relations, or open a view for every model and field."}]
+    # Views from the configuration: a chosen set of models, optionally hiding or highlighting
+    # custom object field groups in that view only.
+    views += [{"id": f"cfg-{i}", "name": v["name"], "configured": True, "blurb": v.get("blurb", ""),
+               "models": [mid for mid in v.get("models", []) if mid in models],
+               "show_groups": v.get("show_groups", []), "hide_groups": v.get("hide_groups", []),
+               "link_fields": v.get("link_fields", []), "mapping_fields": v.get("mapping_fields", [])}
+              for i, v in enumerate(cfg.get("views", []))]
     views += [{"id": "custom-" + (slugify(g) or "other"), "name": g or "Custom objects", "custom": True,
                "blurb": blurbs.get(g, f"Custom object types in the group {g}." if g else "Custom object types without a group.")}
               for g in groups]
@@ -207,6 +216,13 @@ def build():
         views.append({"id": "other", "name": "Other models", "custom": True,
                       "blurb": blurbs.get("Other models", "Models from other apps and plugins that custom object types point at.")})
     views += [{"id": v, "name": n, "blurb": blurbs.get(n, b)} for v, n, b in CORE_VIEWS]
+    hidden = set(cfg.get("hide_views", []))
+    headings = {name: h for h, names in cfg.get("headings", {}).items() for name in names}
+    for v in views:
+        if v["name"] in hidden:
+            v["hidden"] = True   # still reachable by link, just not in the view picker
+        if v["name"] in headings:
+            v["heading"] = headings[v["name"]]   # its own group in the view picker
     notes = cfg.get("rules", {})
     for mid, m in models.items():
         if m["app"] == "custom":

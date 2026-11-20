@@ -1,9 +1,10 @@
 <!doctype html>
+<html{% if theme %} data-theme="{{ theme }}"{% endif %}>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NetBox Model Map</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+{% if not embed %}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">{% endif %}
 <style>
 {{ css|safe }}
 html, body { height: 100%; margin: 0; }
@@ -11,6 +12,6 @@ body { background: var(--mm-bg); color: var(--mm-ink); overflow: hidden; }
 .nbmm { height: 100%; min-height: 0; border: 0; border-radius: 0; }
 .mm-head { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 </style>
-{% include 'netbox_model_map/_body.html' with standalone=True %}
-<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+{% if embed %}{% include 'netbox_model_map/_body.html' %}{% else %}{% include 'netbox_model_map/_body.html' with standalone=True %}{% endif %}
+<script src="{{ elk_src }}"></script>
 <script>{{ js|safe }}</script>

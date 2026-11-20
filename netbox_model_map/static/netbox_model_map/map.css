@@ -4,7 +4,7 @@
    (a bottom sheet on phones). */
 :root {
   --mm-bg: #f3f5f7; --mm-surface: #ffffff; --mm-ink: #16202a; --mm-ink-2: #4a5866; --mm-ink-3: #7b8794;
-  --mm-line: #d4dae0; --mm-grid: #dfe4e9; --mm-edge: #9aa5b1; --mm-accent: #2a57cc;
+  --mm-line: #d4dae0; --mm-grid: #dfe4e9; --mm-edge: #9aa5b1; --mm-accent: #2a57cc; --mm-link: #b5177a; --mm-map: #059669;
   --mm-d-tenancy: #94670a; --mm-d-dcim: #2c6a99; --mm-d-ipam: #2a8052; --mm-d-virtualization: #7148b8;
   --mm-d-circuits: #ad4f27; --mm-d-wireless: #0d7f80; --mm-d-vpn: #a8376a; --mm-d-custom: #c94a0c; --mm-d-other: #5f6b7a;
   --mm-sans: var(--bs-body-font-family, "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif);
@@ -12,13 +12,13 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-bs-theme="light"]) {
   --mm-bg: #0e1318; --mm-surface: #161d25; --mm-ink: #e3e8ed; --mm-ink-2: #a7b2bd; --mm-ink-3: #748090;
-  --mm-line: #2a3440; --mm-grid: #1d252e; --mm-edge: #5b6876; --mm-accent: #7ea3ff;
+  --mm-line: #2a3440; --mm-grid: #1d252e; --mm-edge: #5b6876; --mm-accent: #7ea3ff; --mm-link: #f472b6; --mm-map: #34d399;
   --mm-d-tenancy: #e2b450; --mm-d-dcim: #70a9dd; --mm-d-ipam: #5ec48b; --mm-d-virtualization: #a98cf0;
   --mm-d-circuits: #ec8c60; --mm-d-wireless: #4fc8c8; --mm-d-vpn: #e67ba9; --mm-d-custom: #ff8c42; --mm-d-other: #9aa7b4;
   color-scheme: dark } }
 :root[data-theme="dark"], :root[data-bs-theme="dark"] {
   --mm-bg: #0e1318; --mm-surface: #161d25; --mm-ink: #e3e8ed; --mm-ink-2: #a7b2bd; --mm-ink-3: #748090;
-  --mm-line: #2a3440; --mm-grid: #1d252e; --mm-edge: #5b6876; --mm-accent: #7ea3ff;
+  --mm-line: #2a3440; --mm-grid: #1d252e; --mm-edge: #5b6876; --mm-accent: #7ea3ff; --mm-link: #f472b6; --mm-map: #34d399;
   --mm-d-tenancy: #e2b450; --mm-d-dcim: #70a9dd; --mm-d-ipam: #5ec48b; --mm-d-virtualization: #a98cf0;
   --mm-d-circuits: #ec8c60; --mm-d-wireless: #4fc8c8; --mm-d-vpn: #e67ba9; --mm-d-custom: #ff8c42; --mm-d-other: #9aa7b4;
   color-scheme: dark }
@@ -39,6 +39,8 @@
 .mm-controls input[type="search"] { width: 15rem; }
 .mm-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--mm-ink-2); cursor: pointer; white-space: nowrap; }
 .mm-toggle input { accent-color: var(--mm-accent); margin: 0; }
+.mm-btn { height: 32px; padding: 0 10px; border: 1px solid var(--mm-line); border-radius: 6px; background: var(--mm-bg); color: inherit; font: inherit; cursor: pointer; }
+.mm-btn:hover { border-color: var(--mm-accent); }
 .mm-badge { margin-left: auto; font: 500 11.5px var(--mm-mono); color: var(--mm-ink-3); }
 .mm-blurb { margin: 0; color: var(--mm-ink-2); max-width: 75ch; }
 
@@ -56,6 +58,13 @@
 .nbmm .n .t { font: 600 13px var(--mm-sans); fill: var(--mm-ink); }
 .nbmm .n .s { font: 600 9.5px var(--mm-sans); letter-spacing: 0.06em; fill: var(--d); }
 .nbmm .n .k { font: 400 11.5px var(--mm-mono); fill: var(--mm-ink-3); }
+.nbmm .n .k.hl, .nbmm .n .f.hl { fill: var(--mm-accent); font-weight: 600; }
+.nbmm .n .k.opt { font-style: italic; }
+.nbmm .n .k.link, .nbmm .n .gl.link { fill: var(--mm-link); font-weight: 600; }
+.mm-legend .mm-link-key, .mm-legend .mm-link-key b { color: var(--mm-link); }
+.nbmm .n .f.map, .nbmm .n .tg.map, .nbmm .n .gl.map { fill: var(--mm-map); font-weight: 600; }
+.mm-legend .mm-map-key, .mm-legend .mm-map-key b { color: var(--mm-map); }
+.mm-legend-bar .mm-legend { position: static; max-width: none; margin-top: 8px; }
 .nbmm .n .f { font: 400 11.5px var(--mm-mono); fill: var(--mm-ink); }
 .nbmm .n .tg { font: 400 11px var(--mm-sans); fill: var(--mm-ink-2); }
 .nbmm .n .gl { font: 400 11px var(--mm-sans); fill: var(--mm-ink-3); }
@@ -70,9 +79,11 @@
 .nbmm .e { fill: none; stroke: var(--mm-edge); stroke-width: 1.3; }
 .nbmm .e.opt { stroke-dasharray: 5 4; }
 .nbmm .e.gfk { stroke-dasharray: 1.5 3.5; stroke-linecap: round; }
+.nbmm .e.map { stroke: var(--mm-map); stroke-width: 1.8; }
 .nbmm .e.hi { stroke: var(--mm-accent); stroke-width: 2; }
 .nbmm .arrow { fill: var(--mm-edge); }
 .nbmm .arrow-hi { fill: var(--mm-accent); }
+.nbmm .arrow-map { fill: var(--mm-map); }
 .nbmm .has-sel .n:not(.sel):not(.near) { opacity: 0.32; }
 .nbmm .has-sel .e:not(.hi) { opacity: 0.14; }
 @media (prefers-reduced-motion: no-preference) { .nbmm .n, .nbmm .e { transition: opacity 0.15s; } }

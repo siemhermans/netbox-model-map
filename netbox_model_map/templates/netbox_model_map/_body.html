@@ -5,8 +5,10 @@
       <select id="mm-view" class="no-ts" aria-label="View"></select>
       <input id="mm-search" type="search" list="mm-models" placeholder="Find a model…" aria-label="Find a model">
       <datalist id="mm-models"></datalist>
+      <label class="mm-toggle"><input id="mm-fields" type="checkbox"> Optional fields</label>
       <label class="mm-toggle"><input id="mm-optional" type="checkbox" checked> Optional links</label>
       <label class="mm-toggle"><input id="mm-tenant" type="checkbox"> Tenant links</label>
+      <button type="button" class="mm-btn" id="mm-svgdl" title="Download this view as an SVG image">Download SVG</button>
       <span class="mm-badge" id="mm-badge"></span>
     </div>
     <p class="mm-blurb" id="mm-blurb"></p>
@@ -15,15 +17,13 @@
     <svg class="mm-svg" id="mm-svg" aria-label="Data model diagram">
       <defs>
         <marker id="mm-arr" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0.5 L8,4 L0,7.5 z"/></marker>
+        <marker id="mm-arr-map" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-map" d="M0,0.5 L8,4 L0,7.5 z"/></marker>
         <marker id="mm-arr-hi" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-hi" d="M0,0.5 L8,4 L0,7.5 z"/></marker>
       </defs>
       <g id="mm-viewport"></g>
     </svg>
     <div class="mm-status" id="mm-status">Laying out…</div>
-    <div class="mm-legend" aria-label="Legend">
-      <span><b>●</b> required</span><span><b>○</b> optional</span><span><b>∗</b> many</span><span><b>~</b> one of several types</span>
-      <span>arrows point from what must exist first</span><span>dashed box: in another view</span><span>Ctrl + scroll to zoom</span>
-    </div>
+    {% if not nolegend %}{% include 'netbox_model_map/_legend.html' %}{% endif %}
     <div class="mm-zoom">
       <button type="button" id="mm-zout" aria-label="Zoom out">−</button><button type="button" id="mm-zfit" aria-label="Fit to screen">⤢</button><button type="button" id="mm-zin" aria-label="Zoom in">+</button>
     </div>

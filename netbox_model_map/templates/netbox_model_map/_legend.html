@@ -1,0 +1,8 @@
+{# The map legend; the compare page shows one shared copy (all=True) under both panes. #}
+<div class="mm-legend" aria-label="Legend">
+  <span><b>●</b> required</span><span><b>○</b> optional</span><span><b>∗</b> many</span><span><b>~</b> one of several types</span>
+  <span id="mm-legend-opt"{% if not all %} hidden{% endif %}><b><i>field</i></b> optional field</span>
+  <span class="mm-map-key" id="mm-legend-map"{% if not all %} hidden{% endif %}><b>→</b> object mapping: a real link from one object to another, checked by NetBox</span>
+  <span class="mm-link-key" id="mm-legend-link"{% if not all %} hidden{% endif %}><b>↔</b> connecting field: objects with the same value belong together</span>
+  <span>arrows point from what must exist first</span><span>dashed box: in another view</span><span>Ctrl + scroll to zoom</span>
+</div>

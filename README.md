@@ -15,8 +15,8 @@ instance, so it always shows *your* custom object types and fields.
   types without a group share one.
 - **Other models:** when a custom object field points at a model outside these
   apps (another plugin, tags, users), that model appears in an "Other models" view.
-- **Relations on the field they come from.** Each box lists its key fields and
-  every relation: `●` required, `○` optional, `∗` many-to-many, `~` one of
+- **Relations on the field they come from.** Each box lists its key fields
+  (required or primary, at most six) and every relation: `●` required, `○` optional, `∗` many-to-many, `~` one of
   several types (a generic relation). Arrows run from what must exist first to
   what points at it, so each view reads left to right in the order you create
   objects.
@@ -25,9 +25,14 @@ instance, so it always shows *your* custom object types and fields.
   to, what references it, its rules and key fields, and a link to its list in
   NetBox. Rules come from unique constraints, custom field validation
   (min/max, regex, choice set) and your own notes (see Configuration).
+- **Optional fields:** a switch that lists every field in the boxes, optional
+  ones in italics. It is off by default.
 - **Controls:** show or hide optional links and links to Tenant, search for a
   model, drag to pan, zoom with Ctrl + scroll, the buttons or the `+` `-` `0`
   keys. The map follows NetBox's light/dark mode.
+- **Compare views:** two views side by side, each with its own view picker, details
+  panel and zoom (`/plugins/model-map/?compare`, or `?compare&left=<view>&right=<view>`).
+- **Download SVG:** the view on screen as an SVG image, for documents and slides.
 - **Download as HTML:** a single file with the whole map that works without
   NetBox, for sharing. It loads the layout library and fonts from the internet
   when opened.
@@ -48,12 +53,12 @@ itself works offline; only the downloaded HTML file needs internet.
 
 ```bash
 source /opt/netbox/venv/bin/activate
-pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.1.0.tar.gz
+pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.2.0.tar.gz
 ```
 
 Without internet on the NetBox host, download the wheel from the
 [Releases](https://github.com/siemhermans/netbox-model-map/releases) page and run
-`pip install --no-deps netbox_model_map-0.1.0-py3-none-any.whl`.
+`pip install --no-deps netbox_model_map-0.2.0-py3-none-any.whl`.
 
 To keep the plugin across NetBox upgrades, add the same URL (or the path to the
 wheel) to `/opt/netbox/local_requirements.txt`.
@@ -80,7 +85,7 @@ sudo systemctl restart netbox netbox-rq
 Add to the Dockerfile that installs your plugins:
 
 ```dockerfile
-RUN /usr/local/bin/uv pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.1.0.tar.gz \
+RUN /usr/local/bin/uv pip install https://github.com/siemhermans/netbox-model-map/archive/refs/tags/v0.2.0.tar.gz \
  && cp -r "$(/opt/netbox/venv/bin/python -c 'import netbox_model_map, os; print(os.path.dirname(netbox_model_map.__file__))')/static/netbox_model_map" \
           /opt/netbox/netbox/static/
 ```
@@ -118,6 +123,26 @@ PLUGINS_CONFIG = {
         # Models on the overview. Default: a set of core models plus every
         # custom object type.
         "overview": ["Site", "Device", "IPAddress", "my-custom-type"],
+        # Extra views, listed first in the view picker: a chosen set of models.
+        # Optionally hide or highlight custom object field groups in that view only.
+        "views": [
+            {"name": "Ordering flow", "blurb": "What the order script creates.",
+             "models": ["my-custom-type", "Device", "IPAddress"],
+             "show_groups": ["Request"], "hide_groups": [],
+             # Fields that tie objects together by a shared value instead of a
+             # relation: shown with ↔ in their own colour.
+             "link_fields": ["request_id"],
+             # Relation fields that map one object to another: their rows and
+             # arrows get their own colour.
+             "mapping_fields": ["components"]},
+        ],
+        # Views to leave out of the view picker, by name (still reachable by link).
+        "hide_views": ["Other models"],
+        # Views listed under their own heading in the view picker, by name and in
+        # this order. Works for configured views and custom object group views.
+        "headings": {
+            "Proposal": ["Ordering flow", "My group"],
+        },
     },
 }
 ```
@@ -180,6 +205,22 @@ python -m build
 
 Both land in `dist/`. Bump `version` in `pyproject.toml` and in
 `netbox_model_map/__init__.py` together.
+
+## Changelog
+
+**0.2.0**
+
+- Compare two views side by side (`?compare`).
+- Download the view on screen as an SVG image.
+- Configurable views (`views`, with `show_groups`, `hide_groups`, `link_fields`
+  and `mapping_fields`) and `hide_views`.
+- `headings`: list views under their own heading in the view picker.
+- **Optional fields** switch: every field in the boxes, optional ones in italics.
+  Off by default, so the boxes look the same as in 0.1.0.
+
+**0.1.0**
+
+- First release.
 
 ## License
 

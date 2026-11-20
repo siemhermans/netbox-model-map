@@ -13,19 +13,37 @@ const isSelf = (id, r) => r.targets.length === 1 && r.targets[0] === id;
 const glyph = r => r.kind === "m2m" ? "∗" : r.kind === "gfk" ? "~" : r.req ? "●" : "○";
 function targetText(id, r) {
   if (isSelf(id, r)) return M[id].label + " (self)";
-  if (r.kind === "gfk") return !r.targets.length ? "any of several types"
+  // A polymorphic multi-object field is an m2m with several targets: name them all, like a gfk.
+  const names = !r.targets.length ? "any of several types"
     : r.targets.length > 3 ? `one of ${r.targets.length} types` : r.targets.map(t => M[t].label).join(" | ");
-  return M[r.targets[0]].label + (r.kind === "m2m" ? " (many)" : r.kind === "o2o" ? " (1:1)" : "");
+  return names + (r.kind === "m2m" ? " (many)" : r.kind === "o2o" ? " (1:1)" : "");
 }
 for (const m of Object.values(M)) m.inbound = [];
 for (const [id, m] of Object.entries(M)) for (const r of m.rels) for (const t of r.targets) if (t !== id) M[t].inbound.push({ from: id, rel: r });
-const membersOf = v => v === "overview" ? D.overview : Object.keys(M).filter(id => M[id].view === v);
+const membersOf = v => v === "overview" ? D.overview : VIEWS[v].models || Object.keys(M).filter(id => M[id].view === v);
+// A configured view can hide or highlight custom object field groups, in that view only.
+const relsIn = (id, v) => M[id].rels.filter(r => !(VIEWS[v].hide_groups || []).includes(r.group));
+function keysIn(id, v, st) {
+  const m = M[id], f = m.fields || {}, V = VIEWS[v];
+  const hidden = new Set((V.hide_groups || []).flatMap(g => f[g] || []));
+  const shown = (V.show_groups || []).flatMap(g => f[g] || []), links = V.link_fields || [];
+  // "Optional fields" on: every field in model order, optional ones marked; off: only the key fields.
+  const base = st.fields ? m.all || m.keys : m.keys, opt = k => st.fields && !(m.req || m.keys).includes(k);
+  const keys = base.filter(k => !hidden.has(k)).map(k => ({ k, hl: shown.includes(k), opt: opt(k) }));
+  for (const k of shown) if (!base.includes(k)) keys.push({ k, hl: true, opt: opt(k) });
+  // Link fields connect objects by a shared value rather than a relation: marked ↔ in their own colour.
+  for (const key of keys) key.link = links.includes(key.k);
+  return keys;
+}
 
 /* ---------- controls ---------- */
 $("badge").textContent = `NetBox ${D.netbox} · ` + Object.entries(D.plugins).map(([k, v]) => `${k} ${v}`).join(" · ") + ` · read ${D.generated}`;
 const viewSelect = $("view");
-const groups = [["", D.views.filter(v => v.id === "overview")], ["Custom objects", D.views.filter(v => v.custom)],
-  ["Core NetBox", D.views.filter(v => v.id !== "overview" && !v.custom)]];
+const listed = D.views.filter(v => !v.hidden), plain = listed.filter(v => !v.heading);
+const headed = [...new Set(listed.map(v => v.heading).filter(Boolean))].map(h => [h, listed.filter(v => v.heading === h)]);
+const groups = [["", plain.filter(v => v.id === "overview")], ["Views", plain.filter(v => v.configured)], ...headed,
+  ["Custom objects", plain.filter(v => v.custom)],
+  ["Core NetBox", plain.filter(v => v.id !== "overview" && !v.custom && !v.configured)]];
 for (const [label, views] of groups) {
   if (!views.length) continue;
   const parent = label ? viewSelect.appendChild(Object.assign(document.createElement("optgroup"), { label })) : viewSelect;
@@ -59,18 +77,19 @@ function compactNode(id, nodeId, meta, ghost) {
   return { id: nodeId, width: w, height: 44 };
 }
 
-function detailNode(id, meta) {
-  const m = M[id], rows = [];
+function detailNode(id, meta, v, st) {
+  const m = M[id], rows = [], keys = keysIn(id, v, st), rels = relsIn(id, v), show = VIEWS[v].show_groups || [];
+  const maps = VIEWS[v].mapping_fields || [];
   let y = HEAD + 6;
-  for (const k of m.keys) { rows.push({ key: k, y }); y += ROW; }
-  if (m.keys.length && m.rels.length) y += 7;
-  for (const r of m.rels) { rows.push({ r, y }); y += ROW; }
-  const nested = m.rels.some(r => isSelf(id, r));
+  for (const { k, hl, link, opt } of keys) { rows.push({ key: k, hl, link, opt, y }); y += ROW; }
+  if (keys.length && rels.length) y += 7;
+  for (const r of rels) { rows.push({ r, hl: show.includes(r.group), map: maps.includes(r.field), y }); y += ROW; }
+  const nested = rels.some(r => isSelf(id, r));
   let w = Math.max(tw(m.label, "title") + (nested ? 22 : 0), subW(domainOf(id))) + 28;
   for (const row of rows) w = Math.max(w, row.key ? tw(row.key, "field") + 40
     : 26 + tw(row.r.field, "field") + 18 + tw(targetText(id, row.r), "target") + 14);
   w = Math.ceil(Math.max(w, 170));
-  meta.set(id, { id, rows, nested, w, h: y + 8, divider: m.keys.length && m.rels.length ? HEAD + 6 + m.keys.length * ROW + 3 : 0 });
+  meta.set(id, { id, rows, nested, w, h: y + 8, divider: keys.length && rels.length ? HEAD + 6 + keys.length * ROW + 3 : 0 });
   return { id, width: w, height: y + 8, layoutOptions: { "elk.portConstraints": "FIXED_POS" },
     ports: rows.filter(row => row.r && !isSelf(id, row.r)).map(row => ({ id: `${id}:${row.r.field}`, width: 1, height: 1, x: -1, y: row.y + ROW / 2 })) };
 }
@@ -96,9 +115,9 @@ function buildGraph(v, st) {
     }
   } else {
     const ghosts = new Set();
-    for (const id of ids) children.push(detailNode(id, nodes));
+    for (const id of ids) children.push(detailNode(id, nodes, v, st));
     let n = 0;
-    for (const id of ids) for (const r of M[id].rels) {
+    for (const id of ids) for (const r of relsIn(id, v)) {
       const many = r.kind === "gfk" && r.targets.length > 4;
       for (const t of r.targets) {
         if (skip(id, t, r)) continue;
@@ -106,7 +125,7 @@ function buildGraph(v, st) {
         if (!inView.has(t)) { if (many) continue; from = "g:" + t; ghosts.add(t); }
         const eid = "e" + n++;
         elkEdges.push({ id: eid, sources: [from], targets: [`${id}:${r.field}`] });
-        edges.set(eid, { r, from, to: id });
+        edges.set(eid, { r, from, to: id, map: (VIEWS[v].mapping_fields || []).includes(r.field) });
       }
     }
     for (const t of ghosts) children.push(compactNode(t, "g:" + t, nodes, true));
@@ -118,7 +137,7 @@ function buildGraph(v, st) {
 }
 
 function layout(v, st) {
-  const key = `${v}|${st.optional}|${st.tenant}`;
+  const key = `${v}|${st.optional}|${st.tenant}|${st.fields}`;
   if (!cache.has(key)) {
     const g = buildGraph(v, st);
     const p = elk.layout(g.root).then(out => ({ out, ...g }));
@@ -145,8 +164,8 @@ function draw(res) {
     const s = e.sections && e.sections[0], meta = res.edges.get(e.id);
     if (!s) continue;
     const pts = [s.startPoint, ...(s.bendPoints || []), s.endPoint];
-    edgeLayer.append(el("path", { d: "M" + pts.map(p => `${p.x},${p.y}`).join(" L"), "marker-end": "url(#mm-arr)",
-      class: "e " + (meta.r.req ? "req" : meta.r.kind === "gfk" ? "gfk" : "opt"), "data-from": meta.from, "data-to": meta.to }));
+    edgeLayer.append(el("path", { d: "M" + pts.map(p => `${p.x},${p.y}`).join(" L"), "marker-end": meta.map ? "url(#mm-arr-map)" : "url(#mm-arr)",
+      class: "e " + (meta.r.req ? "req" : meta.r.kind === "gfk" ? "gfk" : "opt") + (meta.map ? " map" : ""), "data-from": meta.from, "data-to": meta.to }));
   }
   for (const n of res.out.children) {
     const nm = res.nodes.get(n.id), m = M[nm.id];
@@ -164,10 +183,15 @@ function draw(res) {
       if (nm.divider) g.append(el("line", { class: "div", x1: 12, x2: nm.w - 12, y1: nm.divider, y2: nm.divider, "stroke-dasharray": "2 3" }));
       for (const row of nm.rows) {
         const y = row.y + 14;
-        if (row.key) { g.append(el("text", { class: "k", x: 26, y }, row.key)); continue; }
-        g.append(el("text", { class: "gl" + (row.r.req ? " req" : ""), x: 15, y, "text-anchor": "middle" }, glyph(row.r)));
-        g.append(el("text", { class: "f", x: 26, y }, row.r.field));
-        g.append(el("text", { class: "tg", x: nm.w - 12, y, "text-anchor": "end" }, targetText(nm.id, row.r)));
+        if (row.key) {
+          if (row.link) g.append(el("text", { class: "gl link", x: 15, y, "text-anchor": "middle" }, "↔"));
+          g.append(el("text", { class: "k" + (row.hl ? " hl" : "") + (row.link ? " link" : "") + (row.opt ? " opt" : ""), x: 26, y }, row.key));
+          continue;
+        }
+        const mp = row.map ? " map" : "";
+        g.append(el("text", { class: "gl" + (row.r.req ? " req" : "") + mp, x: 15, y, "text-anchor": "middle" }, glyph(row.r)));
+        g.append(el("text", { class: "f" + (row.hl ? " hl" : "") + mp, x: 26, y }, row.r.field));
+        g.append(el("text", { class: "tg" + mp, x: nm.w - 12, y, "text-anchor": "end" }, targetText(nm.id, row.r)));
       }
     }
     nodeLayer.append(g);
@@ -181,7 +205,7 @@ function highlight(nodeId) {
   for (const p of vp.querySelectorAll(".e")) {
     const on = !!nodeId && (p.dataset.from === nodeId || p.dataset.to === nodeId);
     p.classList.toggle("hi", on);
-    p.setAttribute("marker-end", on ? "url(#mm-arr-hi)" : "url(#mm-arr)");
+    p.setAttribute("marker-end", on ? "url(#mm-arr-hi)" : p.classList.contains("map") ? "url(#mm-arr-map)" : "url(#mm-arr)");
     if (on) { near.add(p.dataset.from); near.add(p.dataset.to); p.parentNode.append(p); }
   }
   for (const g of vp.querySelectorAll(".n")) {
@@ -236,7 +260,7 @@ $("zout").onclick = () => zoomCenter(0.8);
 $("zfit").onclick = fit;
 
 /* ---------- state ---------- */
-const state = { view: "overview", sel: null, optional: true, tenant: false };
+const state = { view: "overview", sel: null, optional: true, tenant: false, fields: false };
 
 function setHash() {
   try { history.replaceState(null, "", "#" + (state.sel || "view-" + state.view)); } catch {}
@@ -246,6 +270,10 @@ async function show(view, selId = null) {
   state.view = view;
   viewSelect.value = view;
   $("blurb").textContent = VIEWS[view].blurb;
+  // The legend is absent in a compare pane (the compare page shows one shared legend).
+  if ($("legend-link")) $("legend-link").hidden = !(VIEWS[view].link_fields || []).length;
+  if ($("legend-map")) $("legend-map").hidden = !(VIEWS[view].mapping_fields || []).length;
+  if ($("legend-opt")) $("legend-opt").hidden = !state.fields;
   $("status").hidden = false;
   try {
     const res = await layout(view, state);
@@ -300,7 +328,31 @@ root.addEventListener("keydown", e => {
   else if (e.key === "0") fit();
 });
 viewSelect.addEventListener("change", () => show(viewSelect.value));
+/* ---------- SVG download ---------- */
+// The diagram's look comes from CSS classes and variables, so copy each element's computed style
+// onto the copy: the file then looks the same in any viewer (Inkscape, Visio, a browser).
+const SVG_PROPS = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-opacity", "opacity",
+  "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "text-anchor", "display"];
+function downloadSvg() {
+  if (!current) return;
+  const nid = state.sel ? nodeIdFor(state.sel) : null;
+  highlight(null);   // export the plain diagram, not the selection dimming
+  const W = Math.ceil(current.out.width), H = Math.ceil(current.out.height), out = svg.cloneNode(true);
+  const src = svg.querySelectorAll("*"), dst = out.querySelectorAll("*");
+  src.forEach((e, i) => { const cs = getComputedStyle(e); dst[i].setAttribute("style", SVG_PROPS.map(p => `${p}:${cs.getPropertyValue(p)}`).join(";")); });
+  highlight(nid);
+  for (const a of ["id", "class", "aria-label", "style"]) out.removeAttribute(a);
+  Object.entries({ xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` }).forEach(([k, v]) => out.setAttribute(k, v));
+  out.querySelector("#mm-viewport").removeAttribute("transform");
+  out.insertBefore(el("rect", { width: W, height: H, fill: css.getPropertyValue("--mm-bg").trim() || "#fff" }), out.querySelector("#mm-viewport"));
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(out)], { type: "image/svg+xml" }));
+  const name = VIEWS[state.view].name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  Object.assign(document.createElement("a"), { href: url, download: `model-map-${name}.svg` }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$("svgdl").addEventListener("click", downloadSvg);
 $("optional").addEventListener("change", e => { state.optional = e.target.checked; show(state.view, state.sel); });
+$("fields").addEventListener("change", e => { state.fields = e.target.checked; show(state.view, state.sel); });
 $("tenant").addEventListener("change", e => { state.tenant = e.target.checked; show(state.view, state.sel); });
 $("search").addEventListener("change", e => {
   const q = e.target.value.trim().toLowerCase();
@@ -336,13 +388,14 @@ function renderPanel() {
     <div class="mm-ptop"><span class="mm-chip">${esc(chip)}</span>
       <button type="button" class="mm-close" id="mm-close" aria-label="Close details">×</button></div>
     <h2>${esc(m.label)}</h2>
-    <p class="mm-meta"><code>${esc(id)}</code>${href ? `<a href="${esc(href)}"${D.netbox_url ? ' target="_blank" rel="noopener"' : ""}>Open in NetBox${D.netbox_url ? " ↗" : ""}</a>` : ""}</p>
+    <p class="mm-meta"><code>${esc(id)}</code>${href ? `<a href="${esc(href)}"${D.netbox_url ? ' target="_blank" rel="noopener"' : D.embed ? ' target="_top"' : ""}>Open in NetBox${D.netbox_url ? " ↗" : ""}</a>` : ""}</p>
     ${m.desc ? `<p class="mm-desc">${esc(m.desc)}</p>` : ""}
     ${section("Needs first", req.map(r => relItem(id, r)), "Nothing: this model can be created on its own.")}
     ${section("Can link to", opt.map(r => relItem(id, r)), "No optional links.")}
     ${section("Referenced by", inbound.map(x => `<li class="mm-rel"><span class="gl${x.rel.req ? " req" : ""}">${glyph(x.rel)}</span><span class="mm-links">${link(x.from)}</span><code class="mm-muted">.${esc(x.rel.field)}</code></li>`), "No other model points here.")}
     ${rules.length ? `<section><h3>Rules</h3><ul class="mm-rules">${rules.join("")}</ul></section>` : ""}
-    ${m.keys.length ? `<section><h3>Key fields</h3><p class="mm-keys">${m.keys.map(k => `<code>${esc(k)}</code>`).join("")}</p></section>` : ""}`;
+    ${m.keys.length ? `<section><h3>Key fields</h3><p class="mm-keys">${m.keys.map(k => `<code>${esc(k)}</code>`).join("")}</p></section>` : ""}
+    ${m.fields ? `<section><h3>Fields</h3>${Object.entries(m.fields).map(([g, fs]) => `<p class="mm-keys">${g ? `<span class="mm-muted">${esc(g)}</span> ` : ""}${fs.map(f => `<code>${esc(f)}</code>`).join("")}</p>`).join("")}</section>` : ""}`;
   panel.scrollTop = 0;
   $("close").onclick = () => select(null);
   for (const b of panel.querySelectorAll("[data-go]")) b.onclick = () => goTo(b.dataset.go);
